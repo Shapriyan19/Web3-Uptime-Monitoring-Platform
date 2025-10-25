@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 contract DomainRegistry{
     
     struct DomainInfo {
+        string _domainURL
         address owner;  //address of the domain owner
         uint256 stakingBalance;    // used for incentivizing the validators
         uint256 interval;   // time interval to check
@@ -35,7 +36,7 @@ contract DomainRegistry{
     function registerDomain(string memory _domainURL, uint256 _interval) public payable checkStaking(0.1 ether) {
         require(domains[_domainURL].owner == address(0), "Domain already registered");
         userDomains[msg.sender].push(_domainURL);
-        domains[_domainURL] = DomainInfo(msg.sender, msg.value, _interval);
+        domains[_domainURL] = DomainInfo(_domainURL, msg.sender, msg.value, _interval);
         emit DomainRegistered(msg.sender, _domainURL);
 
     }
