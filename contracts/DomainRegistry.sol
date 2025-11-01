@@ -3,8 +3,16 @@ pragma solidity ^0.8.28;
 
 contract DomainRegistry{
     
+    constructor(){
+        regStake = 0.25 ether;
+        minStake = 0.1 ether;
+    }
+
+    //constants
+    uint256 regStake;
+    uint256 minStake;
+
     struct DomainInfo {
-        string _domainURL;
         address owner;  //address of the domain owner
         uint256 stakingBalance;    // used for incentivizing the validators
         uint256 interval;   // time interval to check
@@ -33,16 +41,27 @@ contract DomainRegistry{
     event IntervalUpdated(string domainURL, uint256 newInterval);
     event StakeWithdrawn(string domainURL, uint256 withdrawalStake);
 
-    function registerDomain(string memory _domainURL, uint256 _interval) public payable checkStaking(0.1 ether) {
+    function registerDomain(string memory _domainURL, uint256 _interval) public payable checkStaking(regStake) {
         require(domains[_domainURL].owner == address(0), "Domain already registered");
         userDomains[msg.sender].push(_domainURL);
-        domains[_domainURL] = DomainInfo(_domainURL, msg.sender, msg.value, _interval);
+        domains[_domainURL] = DomainInfo(msg.sender, msg.value, _interval);
         emit DomainRegistered(msg.sender, _domainURL);
 
     }
 
     function unRegisterDomain(string memory _domainURL) public payable onlyOwner(_domainURL){
         // need to implement
+        uint256 remainingStake = domains[_domainURL].stakingBalance;
+        delete domains[_domainURL];
+        for (uint256 i = 0; i< userDomains[msg.sender].length; i++){
+            if (keccak256(bytes(userDomains[msg.sender][i]))==keccak256(bytes(_domainURL))){
+                userDomains[msg.sender][i]=userDomains[msg.sender][(userDomains[msg.sender].length)-1];
+                userDomains[msg.sender].pop();
+                break;
+            }
+        }
+        (bool sent, ) = payable(msg.sender).call{value: remainingStake}("");
+        require(sent, "Transfer of stake failed");
     }
 
     function stakeTokens(string memory _domainURL) public payable onlyOwner(_domainURL) validDomain(_domainURL) {
@@ -50,14 +69,15 @@ contract DomainRegistry{
         emit TokensStaked(_domainURL, domains[_domainURL].stakingBalance);
     }
 
-    function withdrawStake(string memory _domainURL, uint256 _withdrawalStake) public payable onlyOwner(_domainURL) {
+    function withdrawStake(string memory _domainURL) public payable onlyOwner(_domainURL) {
         DomainInfo storage domain = domains[_domainURL];
-        require(domains[_domainURL].stakingBalance>=_withdrawalStake,"The stake available is less than the withdrawal stake");
-        domain.stakingBalance -= _withdrawalStake;
-        (bool sent, ) = payable(msg.sender).call{value: _withdrawalStake}("");
+        require(domains[_domainURL].stakingBalance>=msg.value,"The stake available is less than the withdrawal stake");
+        require(((domains[_domainURL].stakingBalance)-msg.value)>=minStake, "Cannot withdraw");
+        domain.stakingBalance -= msg.value;
+        (bool sent, ) = payable(msg.sender).call{value: msg.value}("");
         require(sent, "Withdrawal failed");
 
-        emit StakeWithdrawn(_domainURL, _withdrawalStake);
+        emit StakeWithdrawn(_domainURL, msg.value);
     }
 
     function updateInterval(string memory _domainURL, uint256 _interval) public onlyOwner(_domainURL){
@@ -71,5 +91,10 @@ contract DomainRegistry{
 
     function getOwnerDomains() public view returns(string[] memory){
         return(userDomains[msg.sender]);
+    }
+
+    function deductStake(string memory _domainURL,uint256 _totalReward) public view {
+        DomainInfo memory info = domains[_domainURL];
+        info.stakingBalance -= _totalReward;
     }
 }
