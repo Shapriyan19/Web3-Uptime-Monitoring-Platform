@@ -66,6 +66,7 @@ contract MonitoringScheduler {
             if (validatorList[i]==msg.sender){
                 validatorList[i]=validatorList[(validatorList.length)-1];
                 validatorList.pop();
+                break;
             }
         }   
         //might need to remove from validatorjobs also
@@ -132,6 +133,7 @@ contract MonitoringScheduler {
             if (keccak256(bytes(validatorJobs[oldValidator][i]))==keccak256(bytes(_domainURL))){
                 validatorJobs[oldValidator][i]=validatorJobs[oldValidator][(validatorJobs[oldValidator].length)-1];
                 validatorJobs[oldValidator].pop();
+                break;
             }
         }
 
@@ -220,7 +222,8 @@ contract MonitoringScheduler {
         return validatorJobs[_validator];
     }
 
-    function getDomainHistory(string memory _domainURL) public view returns(MonitoringJob[] ){
+    function getDomainHistory(string memory _domainURL) public view returns(MonitoringJob[] memory){
         return domainJobs[_domainURL];
     }
+
 }

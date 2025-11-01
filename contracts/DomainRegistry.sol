@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 contract DomainRegistry{
     
     struct DomainInfo {
-        string _domainURL
+        string _domainURL;
         address owner;  //address of the domain owner
         uint256 stakingBalance;    // used for incentivizing the validators
         uint256 interval;   // time interval to check
@@ -39,6 +39,10 @@ contract DomainRegistry{
         domains[_domainURL] = DomainInfo(_domainURL, msg.sender, msg.value, _interval);
         emit DomainRegistered(msg.sender, _domainURL);
 
+    }
+
+    function unRegisterDomain(string memory _domainURL) public payable onlyOwner(_domainURL){
+        // need to implement
     }
 
     function stakeTokens(string memory _domainURL) public payable onlyOwner(_domainURL) validDomain(_domainURL) {
