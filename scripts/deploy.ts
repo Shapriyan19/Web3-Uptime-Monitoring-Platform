@@ -1,8 +1,8 @@
 import {network} from "hardhat";
 
 const {ethers} = await network.connect({
-  network: "hardhatOp",
-  chainType: "op",
+  network: "sepolia",
+  chainType: "l1",
 });
 
 async function main(){
