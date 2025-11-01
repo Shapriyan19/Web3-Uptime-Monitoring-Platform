@@ -13,6 +13,7 @@ contract DomainRegistry{
     uint256 minStake;
     address public rewardsManager;
     address public resultAggregator;
+    address public monitoringScheduler;
 
     struct DomainInfo {
         address owner;  //address of the domain owner
@@ -51,6 +52,11 @@ contract DomainRegistry{
     function setResultAggregator(address _resultAggregator) external {
         require(resultAggregator == address(0), "Already set");
         resultAggregator = _resultAggregator;
+    }
+
+    function setMonitoringScheduler(address _monitoringScheduler) external {
+        require(monitoringScheduler == address(0), "Already set");
+        monitoringScheduler = _monitoringScheduler;
     }
 
     function registerDomain(string memory _domainURL, uint256 _interval) public payable checkStaking(regStake) {

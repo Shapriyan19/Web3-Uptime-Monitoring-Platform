@@ -267,7 +267,7 @@ contract ResultAggregator is AutomationCompatibleInterface {
                         idx++;
                     }
                 }
-                RewardsManager(rewardsManager).distributeRewards(_domainURL, _cycleId, honestValidators);
+                IRewardsManager(rewardsManager).distributeRewards(_domainURL, _cycleId, honestValidators);
             }
 
             DomainStats storage stats = domainStats[_domainURL];
@@ -328,6 +328,6 @@ contract ResultAggregator is AutomationCompatibleInterface {
 
 }
 
-interface RewardsManager {
+interface IRewardsManager {
     function distributeRewards(string memory domainURL, uint256 cycleId, address[] memory honestValidators) external;
 }
