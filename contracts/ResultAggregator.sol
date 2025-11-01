@@ -2,9 +2,9 @@
 pragma solidity ^0.8.28;
 import "./MonitoringScheduler.sol";
 import "./DomainRegistry.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 
-contract ResultAggregator is KeeperCompatibleInterface {
+contract ResultAggregator is AutomationCompatibleInterface {
 
     MonitoringScheduler public monitoringScheduler;
     DomainRegistry public domainRegistry;
@@ -115,6 +115,7 @@ contract ResultAggregator is KeeperCompatibleInterface {
     }
 
     // Chainlink Keeper check if upkeep needed
+    // Chainlink Keeper check if upkeep needed
     function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
         // Find domains that need a new check cycle (based on last scheduled time + interval)
         string memory domainToCheck = "";
@@ -132,8 +133,10 @@ contract ResultAggregator is KeeperCompatibleInterface {
             }
         }
         upkeepNeeded = found;
-        performData = found ? abi.encode(domainToCheck) : "";
+        // both branches now return bytes memory
+        performData = found ? abi.encode(domainToCheck) : bytes("");
     }
+
 
     // Chainlink Keeper performs upkeep by calling initiateCheckCycle
     function performUpkeep(bytes calldata performData) external override {
@@ -318,11 +321,11 @@ contract ResultAggregator is KeeperCompatibleInterface {
         }
         return recentCycles;
     }
-
-    // Get stats for a domain
-    function getDomainStats(string memory _domainURL) external view returns (DomainStats memory) {
+    
+    function fetchDomainStats(string memory _domainURL) external view returns (DomainStats memory) {
         return domainStats[_domainURL];
     }
+
 }
 
 interface RewardsManager {

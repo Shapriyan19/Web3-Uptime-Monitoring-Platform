@@ -57,7 +57,7 @@ contract DomainRegistry{
         require(domains[_domainURL].owner == address(0), "Domain already registered");
         userDomains[msg.sender].push(_domainURL);
         domains[_domainURL] = DomainInfo(msg.sender, msg.value, _interval);
-        ResultAggregator(resultAggregator).addDomainForMonitoring(_domainURL);
+        IResultAggregator(resultAggregator).addDomainForMonitoring(_domainURL);
         emit DomainRegistered(msg.sender, _domainURL);
     }
 
@@ -119,6 +119,6 @@ contract DomainRegistry{
     }
 }
 
-interface ResultAggregator {
+interface IResultAggregator {
     function addDomainForMonitoring(string memory _domainURL) external;
 }
