@@ -11,6 +11,8 @@ contract DomainRegistry{
     //constants
     uint256 regStake;
     uint256 minStake;
+    address public rewardsManager;
+    address public resultAggregator;
 
     struct DomainInfo {
         address owner;  //address of the domain owner
@@ -41,12 +43,22 @@ contract DomainRegistry{
     event IntervalUpdated(string domainURL, uint256 newInterval);
     event StakeWithdrawn(string domainURL, uint256 withdrawalStake);
 
+    function setRewardsManager(address _rewardsManager) external {
+        require(rewardsManager == address(0), "Already set");
+        rewardsManager = _rewardsManager;
+    }
+
+    function setResultAggregator(address _resultAggregator) external {
+        require(resultAggregator == address(0), "Already set");
+        resultAggregator = _resultAggregator;
+    }
+
     function registerDomain(string memory _domainURL, uint256 _interval) public payable checkStaking(regStake) {
         require(domains[_domainURL].owner == address(0), "Domain already registered");
         userDomains[msg.sender].push(_domainURL);
         domains[_domainURL] = DomainInfo(msg.sender, msg.value, _interval);
+        ResultAggregator(resultAggregator).addDomainForMonitoring(_domainURL);
         emit DomainRegistered(msg.sender, _domainURL);
-
     }
 
     function unRegisterDomain(string memory _domainURL) public payable onlyOwner(_domainURL){
@@ -93,8 +105,20 @@ contract DomainRegistry{
         return(userDomains[msg.sender]);
     }
 
-    function deductStake(string memory _domainURL,uint256 _totalReward) public view {
-        DomainInfo memory info = domains[_domainURL];
-        info.stakingBalance -= _totalReward;
+    function deductStake(string memory _domainURL, uint256 _totalReward) external {
+        require(msg.sender == address(rewardsManager), "Only RewardsManager");
+        require(domains[_domainURL].stakingBalance >= _totalReward, "Insufficient stake");
+        domains[_domainURL].stakingBalance -= _totalReward;
+
+        (bool sent, ) = payable(rewardsManager).call{value: _totalReward}("");
+        require(sent, "Transfer to RewardsManager failed");
     }
+
+    function getDomainInterval(string memory _domainURL) public view returns (uint256) {
+        return domains[_domainURL].interval;
+    }
+}
+
+interface ResultAggregator {
+    function addDomainForMonitoring(string memory _domainURL) external;
 }

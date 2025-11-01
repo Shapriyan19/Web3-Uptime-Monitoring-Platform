@@ -77,7 +77,7 @@ contract MonitoringScheduler {
         return validatorList;
     }
     
-    function assignJob(string memory _domainURL) public {
+    function assignJob(string memory _domainURL) public returns (address) {
         require(validatorList.length>0, "No validators active");
 
         // Get domain info from DomainRegistry
@@ -108,6 +108,7 @@ contract MonitoringScheduler {
         currentIndex = (currentIndex + 1) % validatorList.length;
 
         emit JobAssigned(_domainURL, selectedValidator, currentTime);
+        return (selectedValidator);
     }
 
     function reassignJob(string memory _domainURL) public {
@@ -224,6 +225,11 @@ contract MonitoringScheduler {
 
     function getDomainHistory(string memory _domainURL) public view returns(MonitoringJob[] memory){
         return domainJobs[_domainURL];
+    }
+
+    function getSchedule(string memory _domain) public view returns (string memory, uint256, uint256){
+        DomainSchedule memory info = schedules[_domain];
+        return (info.domainURL, info.lastScheduledTime, info.interval);
     }
 
 }
