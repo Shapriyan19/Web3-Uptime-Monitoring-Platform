@@ -10,14 +10,14 @@ contract MonitoringScheduler {
         domainRegistry = DomainRegistry(_domainRegistry);
     }
 
-    struct Validator { // for each validator in the system
+    struct Validator {
         address validatorAddress;
         bool isActive;
         uint256 totalJobsAssigned;
         uint256 lastAssignedTime;
     }
 
-    struct MonitoringJob {  // represents single monitoring task assigned to validator for specific domain
+    struct MonitoringJob {
         string domainURL;
         address validator;
         uint256 assignedTime;
@@ -25,27 +25,23 @@ contract MonitoringScheduler {
         bool isCompleted;
     }
 
-    struct DomainSchedule { // represents scheduling info for each domain
+    struct DomainSchedule {
         string domainURL;
         uint256 interval;
         address[] assignedValidators;
         uint256 lastScheduledTime;
     }
 
-    // Validator management
-    mapping (address => Validator) public validators; //Stores validator information
-    address[] public validatorList; //For iteration or random selection.
+    mapping (address => Validator) public validators;
+    address[] public validatorList;
 
-    //Job Management
-    mapping(string => MonitoringJob[]) public domainJobs; //Tracks all jobs per domain.
-    mapping(address => string[]) public validatorJobs;  //Tracks all jobs a validator is handling.
+    mapping(string => MonitoringJob[]) public domainJobs;
+    mapping(address => string[]) public validatorJobs;
 
-    //DomainScheduling
-    mapping(string => DomainSchedule) public schedules; //Keeps track of assignment intervals and history per domain.
+    mapping(string => DomainSchedule) public schedules;
 
-    //Counters
-    uint256 public totalJobsAssigned;   //Useful for monitoring activity and load balancing.
-    uint256 private currentIndex = 0; // Round-robin pointer
+    uint256 public totalJobsAssigned;
+    uint256 private currentIndex = 0;
 
     event ValidatorRegistered(address validator);
     event ValidatorDeactivated(address validator);
@@ -68,8 +64,7 @@ contract MonitoringScheduler {
                 validatorList.pop();
                 break;
             }
-        }   
-        //might need to remove from validatorjobs also
+        }
         emit ValidatorDeactivated(msg.sender);
     }
 
@@ -80,14 +75,13 @@ contract MonitoringScheduler {
     function assignJob(string memory _domainURL) public returns (address) {
         require(validatorList.length>0, "No validators active");
 
-        // Get domain info from DomainRegistry
         DomainRegistry.DomainInfo memory info = domainRegistry.getDomainInfo(_domainURL);
         require(info.owner != address(0), "Domain not registered");
 
         if (currentIndex >= validatorList.length) {
             currentIndex = 0;
         }
-        // Select validator in round-robin fashion
+        
         address selectedValidator = validatorList[currentIndex];
         uint256 currentTime = block.timestamp;
         uint256 nextCheckTime = currentTime + info.interval;
@@ -101,7 +95,7 @@ contract MonitoringScheduler {
 
         DomainSchedule storage schedule = schedules[_domainURL];
         schedule.interval = info.interval;
-        schedule.lastScheduledTime = currentTime;
+        // REMOVED: schedule.lastScheduledTime = currentTime; ← This was the bug!
         schedule.assignedValidators.push(selectedValidator);
 
         totalJobsAssigned += 1;
@@ -111,23 +105,39 @@ contract MonitoringScheduler {
         return (selectedValidator);
     }
 
+    function initializeSchedule(string memory _domainURL) external {
+        DomainRegistry.DomainInfo memory info = domainRegistry.getDomainInfo(_domainURL);
+        require(info.owner != address(0), "Domain not registered");
+        
+        DomainSchedule storage schedule = schedules[_domainURL];
+        schedule.domainURL = _domainURL;
+        schedule.interval = info.interval;
+        schedule.lastScheduledTime = block.timestamp;
+    }
+
+    // NEW: Function to update schedule after a check cycle completes
+    function updateScheduleAfterCheck(string memory _domainURL) external {
+        DomainRegistry.DomainInfo memory info = domainRegistry.getDomainInfo(_domainURL);
+        require(info.owner != address(0), "Domain not registered");
+        
+        DomainSchedule storage schedule = schedules[_domainURL];
+        schedule.lastScheduledTime = block.timestamp;
+        schedule.interval = info.interval; // Update interval in case it changed
+    }
+
     function reassignJob(string memory _domainURL) public {
         require(validatorList.length>0, "No validators active");
 
-        // Get domain info from DomainRegistry
         DomainRegistry.DomainInfo memory info = domainRegistry.getDomainInfo(_domainURL);
         require(info.owner != address(0), "Domain not registered");
-
         require(domainJobs[_domainURL].length > 0, "No existing job for this domain");
 
-        // Get last assigned validator and job
         MonitoringJob storage oldJob = domainJobs[_domainURL][domainJobs[_domainURL].length - 1];
         address oldValidator = oldJob.validator;
 
         address newValidator = validatorList[currentIndex];
         require(newValidator != oldValidator, "Reassignment unnecessary; same validator selected");
 
-        // Mark old job as completed
         oldJob.isCompleted = true;
 
         for (uint256 i=0; i<validatorJobs[oldValidator].length; i++){
@@ -141,7 +151,6 @@ contract MonitoringScheduler {
         uint256 currentTime = block.timestamp;
         uint256 nextCheckTime = currentTime + info.interval;
 
-        // Create new job
         MonitoringJob memory newJob = MonitoringJob(_domainURL, newValidator, currentTime, nextCheckTime, false);
         domainJobs[_domainURL].push(newJob);
         validatorJobs[newValidator].push(_domainURL);
@@ -151,7 +160,7 @@ contract MonitoringScheduler {
 
         DomainSchedule storage schedule = schedules[_domainURL];
         schedule.interval = info.interval;
-        schedule.lastScheduledTime = currentTime;
+        // REMOVED: schedule.lastScheduledTime = currentTime;
         schedule.assignedValidators.push(newValidator);
 
         currentIndex = (currentIndex + 1) % validatorList.length;
@@ -168,27 +177,21 @@ contract MonitoringScheduler {
         uint256 currentTime = block.timestamp;
         uint256 nextCheckTime = currentTime + info.interval;
 
-        // Select next validator in round-robin
         address nextValidator = validatorList[currentIndex];
 
-        // Create new job
         MonitoringJob memory nextJob = MonitoringJob(_domainURL, nextValidator, currentTime, nextCheckTime, false);
 
-        // Store new job
         domainJobs[_domainURL].push(nextJob);
         validatorJobs[nextValidator].push(_domainURL);
 
-        // Update validator stats
         validators[nextValidator].totalJobsAssigned += 1;
         validators[nextValidator].lastAssignedTime = currentTime;
 
-        // Update schedule info
         DomainSchedule storage schedule = schedules[_domainURL];
         schedule.interval = info.interval;
-        schedule.lastScheduledTime = currentTime;
+        schedule.lastScheduledTime = currentTime; // Update here when scheduling next check
         schedule.assignedValidators.push(nextValidator);
 
-        // Update round-robin pointer
         currentIndex = (currentIndex + 1) % validatorList.length;
 
         emit JobAssigned(_domainURL, nextValidator, currentTime);
@@ -199,12 +202,10 @@ contract MonitoringScheduler {
         require(info.owner != address(0), "Domain not registered");
         require(domainJobs[_domainURL].length > 0, "No monitoring jobs found for this domain");
 
-        // Get the last job for the domain
         MonitoringJob storage lastJob = domainJobs[_domainURL][domainJobs[_domainURL].length - 1];
         require(lastJob.validator==msg.sender);
         lastJob.isCompleted=true;
 
-        // Remove from validator’s pending list
         for (uint256 i = 0; i < validatorJobs[msg.sender].length; i++) {
             if (keccak256(bytes(validatorJobs[msg.sender][i])) == keccak256(bytes(_domainURL))) {
                 validatorJobs[msg.sender][i] = validatorJobs[msg.sender][validatorJobs[msg.sender].length - 1];
@@ -215,7 +216,6 @@ contract MonitoringScheduler {
 
         emit JobCompleted(_domainURL, msg.sender, block.timestamp);
 
-        // Trigger scheduling of next cycle
         updateNextSchedule(_domainURL);
     }
 
@@ -227,9 +227,10 @@ contract MonitoringScheduler {
         return domainJobs[_domainURL];
     }
 
-    function getSchedule(string memory _domain) public view returns (string memory, uint256, uint256){
+    function getSchedule(string memory _domain) public view returns (bool exists, uint256 lastScheduledTime, uint256 interval){
         DomainSchedule memory info = schedules[_domain];
-        return (info.domainURL, info.lastScheduledTime, info.interval);
+        // Return true if schedule has been initialized (has a non-zero interval or domainURL set)
+        exists = bytes(info.domainURL).length > 0 || info.interval > 0;
+        return (exists, info.lastScheduledTime, info.interval);
     }
-
 }

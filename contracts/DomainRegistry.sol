@@ -4,8 +4,8 @@ pragma solidity ^0.8.28;
 contract DomainRegistry{
     
     constructor(){
-        regStake = 0.25 ether;
-        minStake = 0.1 ether;
+        regStake = 0.01 ether;
+        minStake = 0.001 ether;
     }
 
     //constants
@@ -64,6 +64,7 @@ contract DomainRegistry{
         userDomains[msg.sender].push(_domainURL);
         domains[_domainURL] = DomainInfo(msg.sender, msg.value, _interval);
         IResultAggregator(resultAggregator).addDomainForMonitoring(_domainURL);
+        IMonitoringScheduler(monitoringScheduler).initializeSchedule(_domainURL);
         emit DomainRegistered(msg.sender, _domainURL);
     }
 
@@ -127,4 +128,8 @@ contract DomainRegistry{
 
 interface IResultAggregator {
     function addDomainForMonitoring(string memory _domainURL) external;
+}
+
+interface IMonitoringScheduler {
+    function initializeSchedule(string memory _domainURL) external;
 }

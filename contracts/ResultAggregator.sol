@@ -13,25 +13,23 @@ contract ResultAggregator is AutomationCompatibleInterface {
     uint256 public submissionWindow = 5 minutes;
     uint256 public minValidatorsRequired = 3;
 
-    // Track registered domain URLs for iteration
     string[] public monitoredDomains;
+     uint256 public lastCheckedDomainIndex = 0; // NEW: Track which domain to check next
 
     constructor(address _monitoringScheduler, address _domainRegistry){
         monitoringScheduler = MonitoringScheduler(_monitoringScheduler);
         domainRegistry = DomainRegistry(_domainRegistry);
     }
 
-    struct ValidatorResult {    // for single validator submission
+    struct ValidatorResult {
         address validator;
-        // string domainURL;
         bool isUp;
         uint16 httpStatusCode;
-        // uint256 responseTime;
         uint256 submissionTime;
         bytes signature;
     }
 
-    struct CheckCycle { // groups all validator submission
+    struct CheckCycle {
         string domainURL;
         uint256 cycleId;
         uint256 assignedTime;
@@ -45,16 +43,6 @@ contract ResultAggregator is AutomationCompatibleInterface {
         bool isFinalized;
     }
 
-    // struct Incident {   //records when domain goes down
-    //     string domainURL;
-    //     uint256 incidentId;
-    //     uint256 detectedTime;
-    //     uint256 resolvedTime;
-    //     uint256 isOngoing;
-    //     uint16[] httpCodes;
-    //     address[] reportingValidators;
-    // }
-
     struct DomainStats {
         string domainURL;
         uint256 totalChecks;
@@ -65,16 +53,12 @@ contract ResultAggregator is AutomationCompatibleInterface {
         bool currentStatus;
     }
     
-    mapping(string=>mapping(uint256=>CheckCycle)) public cycles;    //Access check cycles by domain and cycleId
-    // mapping(string=>mapping(uint256=>mapping(address=>ValidationResult))) public results;   //store each validator's submission for each cycle
-    // mapping(string => Incident[]) public incidents; //Uptime statistics per domain
-    mapping(string => uint256) public currentCycleId;   //Track the latest cycle number for each domain
-    mapping(string => bool) public isDomainMonitored; // To avoid duplicates
+    mapping(string=>mapping(uint256=>CheckCycle)) public cycles;
+    mapping(string => uint256) public currentCycleId;
+    mapping(string => bool) public isDomainMonitored;
     mapping(string => address[]) internal urlValidator;
     mapping(string => DomainStats) public domainStats;
-    // mapping(address => bool) public authorizedContracts;    //Only MonitoringScheduler can trigger new cycles
 
-    // Events
     event CheckCycleInitiated(string indexed domainURL, uint256 indexed cycleId, address[] assignedValidators);
     event ResultSubmitted(string indexed domainURL, uint256 indexed cycleId, address indexed validator, bool isUp, uint256 timestamp);
     event ConsensusReached(string indexed domainURL, uint256 indexed cycleId, string consensusStatus, uint256 upVotes, uint256 downVotes);
@@ -107,46 +91,106 @@ contract ResultAggregator is AutomationCompatibleInterface {
         rewardsManager = _rewardsManager;
     }
 
-    // Register domain for monitoring automation (call this when domain registered)
     function addDomainForMonitoring(string memory _domainURL) external {
         require(!isDomainMonitored[_domainURL], "Domain already monitored");
         isDomainMonitored[_domainURL] = true;
         monitoredDomains.push(_domainURL);
     }
 
-    // Chainlink Keeper check if upkeep needed
-    // Chainlink Keeper check if upkeep needed
-    function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
-        // Find domains that need a new check cycle (based on last scheduled time + interval)
-        string memory domainToCheck = "";
-        bool found = false;
-        uint256 length = monitoredDomains.length;
-
-        for (uint256 i = 0; i < length; i++) {
-            string memory domain = monitoredDomains[i];
-            (, uint256 lastScheduledTime,) = monitoringScheduler.getSchedule(domain);
-            uint256 interval = domainRegistry.getDomainInterval(domain);
-            if (block.timestamp >= lastScheduledTime + interval) {
-                domainToCheck = domain;
-                found = true;
-                break;
+    /**
+     * CRITICAL FIX #1: Optimized checkUpkeep with round-robin domain checking
+     * This prevents gas limit issues when you have many domains
+     */
+    function checkUpkeep(bytes calldata /* checkData */) 
+        external 
+        view 
+        override 
+        returns (bool upkeepNeeded, bytes memory performData) 
+    {
+        if (monitoredDomains.length == 0) {
+            return (false, bytes(""));
+        }
+        
+        // Check only ONE domain per call (round-robin)
+        uint256 startIndex = lastCheckedDomainIndex;
+        uint256 domainsLength = monitoredDomains.length;
+        
+        for (uint256 i = 0; i < domainsLength; i++) {
+            uint256 currentIndex = (startIndex + i) % domainsLength;
+            string memory domain = monitoredDomains[currentIndex];
+            
+            try monitoringScheduler.getSchedule(domain) returns (
+                bool isActive, 
+                uint256 lastScheduledTime, 
+                uint256 interval
+            ) {
+                if (isActive && block.timestamp >= lastScheduledTime + interval) {
+                    // Found a domain that needs checking!
+                    return (true, abi.encode(domain, currentIndex));
+                }
+            } catch {
+                // Skip domains that cause errors
+                continue;
             }
         }
-        upkeepNeeded = found;
-        // both branches now return bytes memory
-        performData = found ? abi.encode(domainToCheck) : bytes("");
+        
+        return (false, bytes(""));
     }
-
-
-    // Chainlink Keeper performs upkeep by calling initiateCheckCycle
+    
+    /**
+     * CRITICAL FIX #2: Updated performUpkeep to handle new data format
+     */
     function performUpkeep(bytes calldata performData) external override {
         require(performData.length > 0, "No data");
-        (string memory domainURL) = abi.decode(performData, (string));
+        
+        (string memory domainURL, uint256 checkedIndex) = abi.decode(performData, (string, uint256));
+        
+        // Update the round-robin index for next check
+        lastCheckedDomainIndex = (checkedIndex + 1) % monitoredDomains.length;
+        
+        // Verify upkeep is still needed (safety check)
+        (bool isActive, uint256 lastScheduledTime, uint256 interval) = 
+            monitoringScheduler.getSchedule(domainURL);
+        
+        require(isActive, "Domain not active");
+        require(block.timestamp >= lastScheduledTime + interval, "Too early");
+        
+        // Initiate the check cycle
         initiateCheckCycle(domainURL);
+    }
+    
+    /**
+     * HELPER: Get upkeep status for debugging
+     */
+    function getUpkeepStatus() external view returns (
+        uint256 totalDomains,
+        uint256 nextDomainIndex,
+        string memory nextDomain,
+        bool nextDomainReady
+    ) {
+        totalDomains = monitoredDomains.length;
+        nextDomainIndex = lastCheckedDomainIndex;
+        
+        if (totalDomains == 0) {
+            return (0, 0, "", false);
+        }
+        
+        nextDomain = monitoredDomains[lastCheckedDomainIndex];
+        
+        try monitoringScheduler.getSchedule(nextDomain) returns (
+            bool isActive, 
+            uint256 lastScheduledTime, 
+            uint256 interval
+        ) {
+            nextDomainReady = isActive && (block.timestamp >= lastScheduledTime + interval);
+        } catch {
+            nextDomainReady = false;
+        }
+        
+        return (totalDomains, nextDomainIndex, nextDomain, nextDomainReady);
     }
 
     function updateConsensusThreshold(string memory _domainURL, uint256 _newConsensusThreshold) private {
-        // Get domain info from DomainRegistry
         DomainRegistry.DomainInfo memory info = domainRegistry.getDomainInfo(_domainURL);
         require(info.owner != address(0), "Domain not registered");
         require(msg.sender == info.owner);
@@ -154,6 +198,10 @@ contract ResultAggregator is AutomationCompatibleInterface {
     }
 
     function initiateCheckCycle(string memory _domainURL) public {
+        address[] memory validators = monitoringScheduler.getActiveValidators();
+        require(validators.length >= minValidatorsRequired, "Not enough validators registered");
+        require(isDomainMonitored[_domainURL], "Domain not monitored");
+        
         // Assign jobs to validators
         delete urlValidator[_domainURL];
         address validator;
@@ -173,7 +221,7 @@ contract ResultAggregator is AutomationCompatibleInterface {
             assignedValidators[i] = jobs[len - minValidatorsRequired + i].validator;
         }
 
-        // Increment cycleId (assume currentCycleId initialized to 0)
+        // Increment cycleId
         currentCycleId[_domainURL] += 1;
         uint256 cycleId = currentCycleId[_domainURL];
 
@@ -190,9 +238,12 @@ contract ResultAggregator is AutomationCompatibleInterface {
         newCycle.consensusTimestamp = 0;
         newCycle.isFinalized = false;
 
-
-        // Store the cycle and the assignedValidators if you track them!
         cycles[_domainURL][cycleId] = newCycle;
+        
+        // CRITICAL FIX: Update the schedule AFTER initiating the check cycle
+        // This resets the timer so checkUpkeep won't trigger again immediately
+        monitoringScheduler.updateScheduleAfterCheck(_domainURL);
+        
         emit CheckCycleInitiated(_domainURL, cycleId, assignedValidators);
     }
 
@@ -202,7 +253,6 @@ contract ResultAggregator is AutomationCompatibleInterface {
         require(block.timestamp <= cycle.submissionDeadline, "Submission window closed");
         require(!cycle.isFinalized, "Cycle already finalized");
 
-        // Check if validator already submitted (linear search, could optimize)
         for (uint256 i = 0; i < cycle.validationResults.length; i++) {
             require(cycle.validationResults[i].validator != msg.sender, "Validator already submitted");
         }
@@ -257,7 +307,6 @@ contract ResultAggregator is AutomationCompatibleInterface {
             }
             cycle.consensusTimestamp = block.timestamp;
 
-            // Notify RewardsManager of consensus
             if (rewardsManager != address(0)) {
                 address[] memory honestValidators = new address[](upVotes > downVotes ? upVotes : downVotes);
                 uint256 idx = 0;
@@ -282,32 +331,27 @@ contract ResultAggregator is AutomationCompatibleInterface {
                 stats.currentStatus = false;
             }
 
-            // Calculate uptime percentage
             if (stats.totalChecks > 0) {
                 stats.uptimePercentage = (stats.successfulChecks * 100) / stats.totalChecks;
             }
 
             emit ConsensusReached(_domainURL, _cycleId, cycle.consensusStatus, upVotes, downVotes);
-            } 
-        else {
-                emit ConsensusFailed(_domainURL, _cycleId, "No majority consensus");
+        } else {
+            emit ConsensusFailed(_domainURL, _cycleId, "No majority consensus");
         }
     }
 
-    // Get the latest cycle for a domain
     function getLatestCycle(string memory _domainURL) external view returns (CheckCycle memory) {
         uint256 latestCycleId = currentCycleId[_domainURL];
         require(latestCycleId > 0, "No cycles exist for this domain");
         return cycles[_domainURL][latestCycleId];
     }
 
-    // Get current status of a domain (UP/DOWN)
     function getDomainStatus(string memory _domainURL) external view returns (bool isUp, string memory status) {
         DomainStats memory stats = domainStats[_domainURL];
         return (stats.currentStatus, stats.currentStatus ? "UP" : "DOWN");
     }
 
-    // Get recent check cycles (last N cycles)
     function getRecentCycles(string memory _domainURL, uint256 count) external view returns (CheckCycle[] memory) {
         uint256 latestCycleId = currentCycleId[_domainURL];
         require(latestCycleId > 0, "No cycles exist");
@@ -325,7 +369,6 @@ contract ResultAggregator is AutomationCompatibleInterface {
     function fetchDomainStats(string memory _domainURL) external view returns (DomainStats memory) {
         return domainStats[_domainURL];
     }
-
 }
 
 interface IRewardsManager {

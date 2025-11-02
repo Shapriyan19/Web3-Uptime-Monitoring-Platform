@@ -7,7 +7,7 @@ contract RewardsManager {
     DomainRegistry public domainRegistry;
     address public resultAggregator;
 
-    uint256 public rewardPerCheck = 0.01 ether;
+    uint256 public rewardPerCheck = 0.001 ether;
     uint256 public slashAmount = 0.005 ether;
 
     event RewardsPaid(string indexed domainURL, uint256 indexed cycleId, address indexed validator, uint256 amount);

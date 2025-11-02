@@ -33,7 +33,6 @@ async function main(){
     await domainRegistry.setResultAggregator(resultAggregator.target);
     await domainRegistry.setMonitoringScheduler(monitoringScheduler.target);
     await domainRegistry.setRewardsManager(rewardsManager.target);
-    
     await resultAggregator.setRewardsManager(rewardsManager.target);
     await rewardsManager.setResultAggregator(resultAggregator.target);
 
