@@ -119,7 +119,7 @@ To design and develop a decentralized, Web3-based uptime monitoring platform tha
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/Shapriyan19/Web3-Uptime-Monitoring-Platform.git)
 cd "Web3 Uptime Monitoring Platform"
 ```
 
