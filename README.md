@@ -1,7 +1,5 @@
 # Web3 Uptime Monitoring Platform
 
-**This codebase includes a README file (markdown format) for deployment purposes.**
-
 ## Overview
 
 This is a decentralized, Web3-based uptime monitoring platform that leverages blockchain technology, smart contracts, and distributed validators to provide tamper-proof website uptime monitoring. The platform ensures transparency and trust through on-chain verification of downtime incidents, making it ideal for high-stakes web services such as fintech, SaaS, and public infrastructure.
