@@ -1,5 +1,5 @@
 Deploying contract with account: 0x235e0E6383467b03d0D03Db0E474E447a571ac48
-domainRegistry deployed at:  0xb36ba0396bB53341BA1238e0671b797777bC0148
-monitorScheduler deployed at:  0xFE391CC8A150ebAFc420A5C4f861330552c9D214
-resultAggregator deployed at:  0xCfec24Ae2b825229762377f2E65C40B18D8a1157
-rewardsManger deployed at:  0x2cdF1705a05752Fa30aa768c83f4569a047577FC
+domainRegistry deployed at:  0x3D5A4927a2a7E06d3F791d7BEe7A7bBBcA2965E1
+monitorScheduler deployed at:  0x4B9f4d7F2FC6CA0f3be5D17f4E830f18d57CE91d
+resultAggregator deployed at:  0xBe25fe268c6c41f2346910b748BFF7e0cfF82bF0
+rewardsManger deployed at:  0xc01719d334018BcB6AfEc40BC1C3f7a1A590Ec19

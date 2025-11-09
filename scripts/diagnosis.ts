@@ -13,7 +13,7 @@ async function diagnoseThreeValidators() {
     "0xFE391CC8A150ebAFc420A5C4f861330552c9D214"
   );
 
-  const domain = "www.example.com";
+  const domain = "www.chatgpt.com";
 
   console.log("=== THREE VALIDATOR DIAGNOSIS ===\n");
 

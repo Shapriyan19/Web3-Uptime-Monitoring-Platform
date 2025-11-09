@@ -81,7 +81,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Deployed on Sepolia Testnet</p>
+        <p></p>
       </footer>
     </div>
   );

@@ -1,9 +1,9 @@
 // Contract addresses deployed on Sepolia testnet
 export const CONTRACT_ADDRESSES = {
-  domainRegistry: "0xb36ba0396bB53341BA1238e0671b797777bC0148",
-  monitoringScheduler: "0xFE391CC8A150ebAFc420A5C4f861330552c9D214",
-  resultAggregator: "0xCfec24Ae2b825229762377f2E65C40B18D8a1157",
-  rewardsManager: "0x2cdF1705a05752Fa30aa768c83f4569a047577FC",
+  domainRegistry: "0x3D5A4927a2a7E06d3F791d7BEe7A7bBBcA2965E1",
+  monitoringScheduler: "0x4B9f4d7F2FC6CA0f3be5D17f4E830f18d57CE91d",
+  resultAggregator: "0xBe25fe268c6c41f2346910b748BFF7e0cfF82bF0",
+  rewardsManager: "0xc01719d334018BcB6AfEc40BC1C3f7a1A590Ec19",
 };
 
 // Sepolia network configuration
@@ -19,9 +19,9 @@ export const NETWORK_CONFIG = {
   blockExplorerUrls: ["https://sepolia.etherscan.io"],
 };
 
-// Minimum registration stake (0.25 ETH)
+// Minimum registration stake (0.01 ETH)
 export const MIN_REGISTRATION_STAKE = "0.01";
 
-// Minimum stake required (0.1 ETH)
+// Minimum stake required (0.001 ETH)
 export const MIN_STAKE = "0.001";
 
