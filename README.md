@@ -140,12 +140,14 @@ cd ..
 
 ### Deployment
 
-1. Deploy smart contracts:
+> **Note**: If you are using the already deployed contracts (see [Deployed Contracts](#deployed-contracts) section below), you do **not** need to deploy the contracts yourself. Simply skip step 1 and proceed to step 2.
+
+1. Deploy smart contracts (only if deploying new contracts):
 ```bash
 npx hardhat run scripts/deploy.ts --network <network-name>
 ```
 
-2. Update contract addresses in `frontend/src/config/contracts.ts`
+2. Update contract addresses in `frontend/src/config/contracts.ts` with the deployed contract addresses
 
 3. Start the frontend development server:
 ```bash
@@ -174,6 +176,10 @@ The following smart contracts have been deployed to the blockchain:
 **Deployment Account**: `0x235e0E6383467b03d0D03Db0E474E447a571ac48`
 
 > **Note**: These addresses should be updated in `frontend/src/config/contracts.ts` to connect the frontend to the deployed contracts.
+
+### Important: Validator Requirements
+
+**At least 3 validators are required** to see monitoring results. The platform uses a consensus mechanism that requires multiple validators to agree on uptime status before results are aggregated and recorded on-chain. This ensures accuracy and prevents single points of failure. Without a minimum of 3 active validators monitoring a domain, results will not be processed or displayed.
 
 ## Technology Stack
 
